@@ -75,6 +75,9 @@ void unblockSigchld() {
 
 void run_bg(){
     pid_t pid = fork();
+    //add to job list
+    add_job(pid);
+    last_bg_job = pid;
     if(pid < 0){
         perror("Failed to fork");
         exit(EXIT_FAILURE);
@@ -91,11 +94,6 @@ void run_bg(){
             perror("Failed to execute command");
             exit(EXIT_FAILURE);
         }
-    }
-    else{
-        //add to job list
-        add_job(pid);
-        last_bg_job = pid;
     }
 }
 
@@ -124,7 +122,46 @@ void to_fg(pid_t pid){
 
 void execute_command(){
     if(command_bg == 1) run_bg();
-    if(last_bg_job != -1) to_fg(last_bg_job);
+    else if(last_bg_job != -1) to_fg(last_bg_job);
+    else{
+        pid_t pid = fork();
+        //add to job list
+        add_job(pid);
+        last_bg_job = pid;
+        if(pid < 0){
+            perror("Failed to fork");
+            exit(EXIT_FAILURE);
+        }
+        else if(pid == 0){
+            //execute command and arguments
+            int errno_exec = execvp(toks[0], toks);
+            //check for ENOENT
+            if(errno_exec == -1){
+                printf("%s: Command not found\n", toks[0]);  
+                exit(EXIT_FAILURE);
+            }
+            else if(errno_exec < 0){
+                perror("Failed to execute command");
+                exit(EXIT_FAILURE);
+            }
+        }
+        else{
+            // Parent process
+            // Wait for foreground process to finish
+            int status;
+            if (waitpid(pid, &status, WUNTRACED) < 0) {
+                perror("Failed to wait");
+                exit(EXIT_FAILURE);
+            }
+            // Check if the foreground process was stopped by a signal
+            if (WIFSTOPPED(status)) {
+                printf("Foreground process stopped.\n");
+            }
+            // Remove the foreground process from the job list
+            remove_job(&job_list, pid);
+            num_jobs--;
+        }
+    }
 }
 
 //reads a line and returns # of tokens
@@ -170,6 +207,7 @@ int parse(){
     //while((toks[i++] = get_next_token(t)) != NULL);      
     //if last token is &, set bg flag
     if(toks[n-1] != NULL && strcmp(toks[n-1], "&") == 0){
+        if(DEBUG) printf("Backgrounding command\n");
         command_bg = 1;
     }
     //free tokenizer
@@ -284,7 +322,9 @@ int main(void) {
         }
         if(cont_flag) continue;
         blockSigchld();
+        if(DEBUG) printf("Executing command...\n");
         execute_command();
+        if(DEBUG) printf("Command executed.\n");
         unblockSigchld();
         free_toks();
     }
