@@ -207,9 +207,6 @@ int main(void) {
     using_history();
     stifle_history(hist_size);
 
-    //initialize job list
-    job_list = newList();
-
     //loop for shell functionality
     while(1) {
         int num_toks = parse();
