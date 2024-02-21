@@ -32,7 +32,7 @@ char *get_next_token(TOKENIZER *tokenizer){
 
     // check for delimiters
     if (*(tokenizer->pos) == '&' || *(tokenizer->pos) == ';' || *(tokenizer->pos) == '|' || *(tokenizer->pos) == '<' || *(tokenizer->pos) == '>') {
-        char *token = (char *)malloc(2 * sizeof(char));
+        char *token = (char *)malloc(2 * sizeof(char));  
         if (token == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
             exit(EXIT_FAILURE);
@@ -53,14 +53,15 @@ char *get_next_token(TOKENIZER *tokenizer){
 
     // compute length of token
     int length = tokenizer->pos - start;
-    
-    // allocate memory for token and copy substring
+
+    // allocate memory for token and copy substring      
     char *token = (char *)malloc((length + 1) * sizeof(char));
     if (token == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
+        fprintf(stderr, "Memory allocation failed\n");   
         exit(EXIT_FAILURE);
     }
-    strncpy(token, start, length);
+    //strncpy(token, start, length);
+    strcpy(token, start); // copy substring to token
     token[length] = '\0';
 
     return token;

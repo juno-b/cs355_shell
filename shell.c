@@ -44,9 +44,9 @@ void add_job(pid_t pid) {
 void handle_sigchld(int sig) {
     int status;
     pid_t pid;
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {        
-        if (WIFEXITED(status) || WIFSIGNALED(status)){
-            printf("Child process %d has terminated.\n", pid); 
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {  
+        if (WIFEXITED(status) || WIFSIGNALED(status)){   
+            printf("Child process %d has terminated.\n", pid);
             //remove from job list
             remove_job(&job_list, pid);
             num_jobs--;
@@ -83,7 +83,7 @@ void run_bg(){
         int errno_exec = execvp(toks[0], toks);
         //check for ENOENT
         if(errno_exec == -1){
-            printf("%s: Command not found\n", toks[0]);
+            printf("%s: Command not found\n", toks[0]);  
             exit(EXIT_FAILURE);
         }
         else if(errno_exec < 0){
@@ -132,9 +132,7 @@ int parse(){
     int i = 0; int n = 0;
     char * line = readline(MYSH);
     //handle ctrl+d
-    if(line == NULL){
-        return 0;
-    }
+    if(line == NULL) return 0;
     //handle newline
     if(strcmp(line, "") == 0){
         free(line);
@@ -143,31 +141,30 @@ int parse(){
     add_history(line);
     TOKENIZER *t = init_tokenizer(line);
     //count tokens
-    while(get_next_token(t) != NULL){
-        n++;
-    }
-    printf("n: %d\n", n);
+    while(get_next_token(t) != NULL) n++;
+    //re-initialize tokenizer
+    if(t->str != NULL) free(t->str);
+    if(t->pos != NULL) free(t->pos);
+    free(t);
+    t = init_tokenizer(line);
     //allocate pointers to tokens
-    toks = (char**) malloc((n+1) * sizeof(char*));
+    toks = (char**) malloc((n+1) * sizeof(char*));       
     //store pointers to tokens
-    while((toks[i++] = get_next_token(t)) != NULL);
+    while((toks[i++] = get_next_token(t)) != NULL);      
     //if last token is &, set bg flag
-    //printf("toks[n-1]: %s\n", toks[n-1]);
     if(toks[n-1] != NULL && strcmp(toks[n-1], "&") == 0){
         command_bg = 1;
-        toks[n-1] = NULL;
-        n--;
     }
-    printf("toks[0]: %s\n", toks[0]);
     //free tokenizer
+    if(t->str != NULL) free(t->str);
+    if(t->pos != NULL) free(t->pos);
     free(t);
     free(line);
-    printf("freed\n");
     return n;
 }
 
 void free_toks(){
-    for(int i = 0; toks[i] != NULL; i++){
+    for(int i = 0; toks[i]!=NULL; i++){
         free(toks[i]);
     }
     free(toks);
@@ -182,7 +179,7 @@ int main(void) {
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
     if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        perror("Error setting up signal handler for SIGCHLD"); 
+        perror("Error setting up signal handler for SIGCHLD");
         exit(EXIT_FAILURE);
     }
 
@@ -201,7 +198,6 @@ int main(void) {
     //loop for shell functionality
     while(1) {
         int num_toks = parse();
-        printf("num_toks: %d\n", num_toks);
         if(num_toks == 0) continue;
         if(toks[0] == NULL) {
             printf("No command stored.\n");
@@ -209,7 +205,7 @@ int main(void) {
         }
         //compare user input to "exit"
         if (strcmp(toks[0], "exit") == 0) {
-            //free input, job_list and clear history
+            //free input, job_list and clear history     
             clear(&job_list);
             free_toks();
             clear_history();
@@ -221,62 +217,64 @@ int main(void) {
         int cont_flag = 0;
         while(input_hist_flag){
 
-        //add print statements for usage
-        if (strcmp(toks[0], "help") == 0) {
-            printf("Exit: exit\n");
-            printf("This terminal supports history using the following commands:\n");
-            printf("Repeat the last line of input: !!\n");     
-            printf("Repeat the nth command: !n\n");
-            printf("Repeat the nth most recent command: !-n\n");
-            cont_flag = 1;
-            input_hist_flag = 0;
-        }
-
-        //handle history commands
-        else if(strcmp(toks[0], "history") == 0){
-            HIST_ENTRY **hist_list = history_list();
-            for (int i = 0; hist_list[i] != NULL; i++){        
-                printf("%d: %s\n", i + history_base, hist_list[i]->line);
-            }
-            cont_flag = 1;
-            input_hist_flag = 0;
-        }
-        else if (strcmp(toks[0], "!!") == 0) {
-            HIST_ENTRY *last_entry = history_get(history_length - 1);
-            if (last_entry != NULL) {
-                strcpy(toks[0],last_entry->line);
-            }
-            else {
-                printf("No previous command found!\n");        
+            //add print statements for usage
+            if (strcmp(toks[0], "help") == 0) {
+                printf("Exit: exit\n");
+                printf("This terminal supports history using the following commands:\n");
+                printf("Repeat the last line of input: !!\n");
+                printf("Repeat the nth command: !n\n");      
+                printf("Repeat the nth most recent command: !-n\n");
                 cont_flag = 1;
                 input_hist_flag = 0;
             }
-        }
-        else if (strcmp(toks[0], "!") == 0) {
-            int n;
-            if (sscanf(toks[1], "%d", &n) == 1) {
-                //!n and !-n
-                if (n < 0) n = history_length + n;
-                HIST_ENTRY *entry = history_get(n);
-                if (entry != NULL) {
-                    strcpy(toks[0],entry->line);
+
+            //handle history commands
+            else if(strcmp(toks[0], "history") == 0){        
+                HIST_ENTRY **hist_list = history_list();     
+                for (int i = 0; hist_list[i] != NULL; i++){  
+
+                    printf("%d: %s\n", i + history_base, hist_list[i]->line);
+                }
+                cont_flag = 1;
+                input_hist_flag = 0;
+            }
+            else if (strcmp(toks[0], "!!") == 0) {
+                HIST_ENTRY *last_entry = history_get(history_length - 1);
+                if (last_entry != NULL) {
+                    strcpy(toks[0],last_entry->line);        
                 }
                 else {
-                    printf("%s: Command not found.\n", toks[0]);
+                    printf("No previous command found!\n");  
+
                     cont_flag = 1;
                     input_hist_flag = 0;
                 }
             }
+            else if (strcmp(toks[0], "!") == 0) {
+                int n;
+                if (sscanf(toks[1], "%d", &n) == 1) {        
+                    //!n and !-n
+                    if (n < 0) n = history_length + n;       
+                    HIST_ENTRY *entry = history_get(n);      
+                    if (entry != NULL) {
+                        strcpy(toks[0],entry->line);
+                    }
+                    else {
+                        printf("%s: Command not found.\n", toks[0]);
+                        cont_flag = 1;
+                        input_hist_flag = 0;
+                    }
+                }
+            }
+            else{
+                input_hist_flag = 0;
+            }
         }
-        else{
-            input_hist_flag = 0;
-        }
-
-    }
         if(cont_flag) continue;
         blockSigchld();
         execute_command();
         unblockSigchld();
-      }
+        free_toks();
+    }
     return EXIT_SUCCESS;
 }
