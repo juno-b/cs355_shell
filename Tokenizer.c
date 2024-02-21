@@ -4,6 +4,11 @@
 #include <ctype.h>
 #include "Tokenizer.h"
 
+void free_tokenizer(TOKENIZER *tokenizer){
+    free(tokenizer->str);
+    free(tokenizer);
+}
+
 TOKENIZER *init_tokenizer(char *string){
     //malloc a tokenizer
     TOKENIZER *tokenizer = malloc(sizeof(TOKENIZER));
@@ -60,9 +65,8 @@ char *get_next_token(TOKENIZER *tokenizer){
         fprintf(stderr, "Memory allocation failed\n");   
         exit(EXIT_FAILURE);
     }
-    //strncpy(token, start, length);
-    strcpy(token, start); // copy substring to token
-    token[length] = '\0';
+    memcpy(token, start, length);
+    token[length] = '\0'; // Null-terminate the token
 
     return token;
 }

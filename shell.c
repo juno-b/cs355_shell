@@ -13,6 +13,7 @@
 
 #define MAX_ARGS 10
 #define MYSH "mysh: "
+#define DEBUG 1
 
 //emacs -nw hw1.c&
 
@@ -135,31 +136,45 @@ int parse(){
     if(line == NULL) return 0;
     //handle newline
     if(strcmp(line, "") == 0){
-        free(line);
+        if(line != NULL) free(line);
         return 0;
     }
+    if (DEBUG) printf("Command entered: %s\n", line);
     add_history(line);
     TOKENIZER *t = init_tokenizer(line);
     //count tokens
+    int flag = 1;
+    while(flag){
+        char *tok = get_next_token(t);
+        if(tok == NULL) flag = 0;
+        else{
+            free(tok);
+            n++;
+        }
+    }
     while(get_next_token(t) != NULL) n++;
+    if (DEBUG) printf("Number of tokens: %d\n", n);
     //re-initialize tokenizer
-    if(t->str != NULL) free(t->str);
-    if(t->pos != NULL) free(t->pos);
-    free(t);
+    free_tokenizer(t);
     t = init_tokenizer(line);
     //allocate pointers to tokens
     toks = (char**) malloc((n+1) * sizeof(char*));       
     //store pointers to tokens
-    while((toks[i++] = get_next_token(t)) != NULL);      
+    flag = 1;
+    while(flag){
+        toks[i] = get_next_token(t);
+        if(toks[i] == NULL) flag = 0;
+        else if (DEBUG) printf("Token %d: %s\n", i, toks[i]);
+        i++;
+    }
+    //while((toks[i++] = get_next_token(t)) != NULL);      
     //if last token is &, set bg flag
     if(toks[n-1] != NULL && strcmp(toks[n-1], "&") == 0){
         command_bg = 1;
     }
     //free tokenizer
-    if(t->str != NULL) free(t->str);
-    if(t->pos != NULL) free(t->pos);
-    free(t);
-    free(line);
+    free_tokenizer(t);
+    if(line != NULL) free(line);
     return n;
 }
 

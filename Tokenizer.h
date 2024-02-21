@@ -5,3 +5,4 @@ typedef struct tokenizer {
 
 TOKENIZER *init_tokenizer(char *string); //mallocs and initializes a tokenizer
 char *get_next_token(TOKENIZER *tokenizer); //returns next token, ignores white spaces, returns NULL when string ends
+void free_tokenizer(TOKENIZER *tokenizer); //frees tokenizer and string
