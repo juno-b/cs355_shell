@@ -16,7 +16,7 @@ void clear(List *l); // removes all items from list-l
 void add(List *l, pid_t item); // Add item at end of list-l
 void remove_job(List *l, pid_t item); // Remove item from list-l
 struct Job *get(const List *l, int index); // Returns item at index in list-l
-int contains(const List *l, struct Job item); // Does list-l have item?
+int contains(const List *l, pid_t pid); // Does list-l have item?
 void print(const List *l); // prints contents of list (test only)
 
 #endif

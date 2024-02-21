@@ -17,11 +17,29 @@
 //emacs -nw hw1.c&
 
 List job_list; //holds a linked list of jobs
+char **toks; //holds pointers to tokens
 int num_jobs = 0; //holds the number of jobs
 int command_fg = 0; //flag for foregrounding
 int command_bg = 0; //flag for backgrounding
 int command_resume = 0; //flag to resume a command in the foreground, 1 = bg
 pid_t last_bg_job = -1; //stores pid of last bg job, -1 if no background job
+
+//fn prototypes
+void add_job(pid_t pid);
+void handle_sigchld(int sig);
+void handle_sigstop(int sig);
+void blockSigchld();
+void unblockSigchld();
+void run_bg();
+void to_fg(pid_t pid);
+void execute_command();
+int parse();
+void free_toks();
+
+void add_job(pid_t pid) {
+    add(&job_list, pid);
+    num_jobs++;
+}
 
 void handle_sigchld(int sig) {
     int status;
@@ -54,31 +72,7 @@ void unblockSigchld() {
     sigprocmask(SIG_UNBLOCK, &mask, NULL);
 }
 
-void execute_command(char *input){
-    if(command_bg == 1) run_bg(input);
-    else{
-        pid_t pid = fork();
-        if(pid < 0){
-            perror("Failed to fork");
-            exit(EXIT_FAILURE);
-        }
-        else if(pid == 0){
-            //execute command and arguments
-            int errno = execvp(command, args);
-            //check for ENOENT
-            if(errno == -1){
-                printf("%s: Command not found\n", command);
-                exit(EXIT_FAILURE);
-            }
-            else if(errno < 0){
-                perror("Failed to execute command");
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
-}
-
-void run_bg(char *input){
+void run_bg(){
     pid_t pid = fork();
     if(pid < 0){
         perror("Failed to fork");
@@ -86,13 +80,13 @@ void run_bg(char *input){
     }
     else if(pid == 0){
         //execute command and arguments
-        int errno = execvp(command, args);
+        int errno_exec = execvp(toks[0], toks);
         //check for ENOENT
-        if(errno == -1){
-            printf("%s: Command not found\n", command);
+        if(errno_exec == -1){
+            printf("%s: Command not found\n", toks[0]);
             exit(EXIT_FAILURE);
         }
-        else if(errno < 0){
+        else if(errno_exec < 0){
             perror("Failed to execute command");
             exit(EXIT_FAILURE);
         }
@@ -104,9 +98,74 @@ void run_bg(char *input){
     }
 }
 
-void add_job(pid_t pid) {
-    add(&job_list, pid);
-    num_jobs++;
+void to_fg(pid_t pid){
+    //check if pid is in job list
+    if(!contains(&job_list, pid)){
+        printf("Job %d not found.\n", pid);
+        return;
+    }
+    //send SIGCONT to pid
+    if(kill(pid, SIGCONT) < 0){
+        perror("Failed to send SIGCONT");
+        return;
+    }
+    //wait for pid to finish
+    tcsetpgrp(STDIN_FILENO, pid); //give child control of terminal
+    if (waitpid(pid, NULL, WUNTRACED) < 0) {
+        perror("Failed to wait");
+        exit(EXIT_FAILURE);
+    }
+    tcsetpgrp(STDIN_FILENO, getpgrp()); //give control back to shell
+    //remove from job list
+    remove_job(&job_list, pid);
+    num_jobs--;
+}
+
+void execute_command(){
+    if(command_bg == 1) run_bg();
+    if(last_bg_job != -1) to_fg(last_bg_job);
+}
+
+//reads a line and returns # of tokens
+int parse(){
+    //store pointers in global array toks
+    int i = 0; int n = 0;
+    char * line = readline(MYSH);
+    //handle ctrl+d
+    if(line == NULL){
+        return 0;
+    }
+    //handle newline
+    if(strcmp(line, "") == 0){
+        return 0;
+    }
+    add_history(line);
+    TOKENIZER *t = init_tokenizer(line);
+    //count tokens
+    while(get_next_token(t) != NULL){
+        n++;
+    }
+    //allocate pointers to tokens
+    toks = (char**) malloc((n+1) * sizeof(char*));
+    //store pointers to tokens
+    while((toks[i++] = get_next_token(&t)) != NULL);
+    //if last token is &, set bg flag
+    if(strcmp(toks[n-1], "&") == 0){
+        command_bg = 1;
+        toks[n-1] = NULL;
+        n--;
+    }
+    //free tokenizer
+    free(t);
+    free(line);
+    return n;
+}
+
+void free_toks(){
+    for(int i = 0; toks[i] != NULL; i++){
+        free(toks[i]);
+    }
+    free(toks);
 }
 
 int main(void) {
@@ -136,23 +195,13 @@ int main(void) {
 
     //loop for shell functionality
     while(1) {
-        //read user input
-        char *input = NULL;
-        input = readline(MYSH);
-        //printf("INPUT: %s\n", input);
-        if (input == NULL) {
-            perror("Failed to read line");
-            exit(EXIT_FAILURE);
-        }
-
-        //add the command to history
-        add_history(input);
+        int num_toks = parse();
+        if(num_toks == 0) continue;
         //compare user input to "exit"
-        if (strcmp(input, "exit") == 0) {
+        if (strcmp(toks[0], "exit") == 0) {
             //free input, job_list and clear history
-            free(input);
             clear(&job_list);
-            //free(job_list);
+            free_toks();
             clear_history();
             //exit
             printf("Goodbye!\n");
@@ -163,51 +212,47 @@ int main(void) {
         while(input_hist_flag){
 
         //add print statements for usage
-        if (strcmp(input, "help") == 0) {
+        if (strcmp(toks[0], "help") == 0) {
             printf("Exit: exit\n");
             printf("This terminal supports history using the following commands:\n");
             printf("Repeat the last line of input: !!\n");     
             printf("Repeat the nth command: !n\n");
             printf("Repeat the nth most recent command: !-n\n");
-            //free(input);
             cont_flag = 1;
             input_hist_flag = 0;
         }
 
         //handle history commands
-        else if(strcmp(input, "history") == 0){
+        else if(strcmp(toks[0], "history") == 0){
             HIST_ENTRY **hist_list = history_list();
             for (int i = 0; hist_list[i] != NULL; i++){        
                 printf("%d: %s\n", i + history_base, hist_list[i]->line);
             }
-            //free(input);
             cont_flag = 1;
             input_hist_flag = 0;
         }
-        else if (strcmp(input, "!!") == 0) {
+        else if (strcmp(toks[0], "!!") == 0) {
             HIST_ENTRY *last_entry = history_get(history_length - 1);
             if (last_entry != NULL) {
-                strcpy(input,last_entry->line);
+                strcpy(toks[0],last_entry->line);
             }
             else {
                 printf("No previous command found!\n");        
-                //free(input);
                 cont_flag = 1;
                 input_hist_flag = 0;
             }
         }
-        else if (input[0] == '!') {
+        else if (strcmp(toks[0], "!") == 0) {
             int n;
-            if (sscanf(input + 1, "%d", &n) == 1) {
+            if (sscanf(toks[1], "%d", &n) == 1) {
                 //!n and !-n
                 if (n < 0) n = history_length + n;
                 HIST_ENTRY *entry = history_get(n);
                 if (entry != NULL) {
-                    strcpy(input,entry->line);
+                    strcpy(toks[0],entry->line);
                 }
                 else {
-                    printf("%s: Command not found.\n", command);
-                    //free(input);
+                    printf("%s: Command not found.\n", toks[0]);
                     cont_flag = 1;
                     input_hist_flag = 0;
                 }
@@ -219,73 +264,9 @@ int main(void) {
 
     }
         if(cont_flag) continue;
-
-        //parse commands and arguments
-        //handle commands such as emacs, code, ps, cat, gcc, ls, pwd, sleep
-        char *command = strtok(input, " &;|<>\n");
-        //printf("command: %s\n", command);
-
-        char *args[MAX_ARGS + 1];
-        args[0] = command;
-        int arg_count = 1;
-
-        //parse and store arguments
-        char *arg = strtok(NULL, " &;|<>\n");
-        while (arg != NULL && arg_count < MAX_ARGS) {
-            args[arg_count++] = arg;
-            //printf("arg%d: %s\n", arg_count-1, args[arg_count-1]);
-            arg = strtok(NULL, " &;|<>\n");
-        }
-        args[arg_count] = NULL;
-
         blockSigchld();
-        //check if command is a background process
-        if(command_bg) run_bg(trimmed_input);
-        else if(command_fg) to_fg(pid);
-        else if(command_resume){} //resume process
-        else execute_command(trimmed_input);
+        execute_command();
         unblockSigchld();
       }
     return EXIT_SUCCESS;
 }
-
-       /* if (arg_count > 1 && strcmp(args[arg_count - 1], "&") == 0) {
-            background = 1;
-            args[arg_count - 1] = NULL;
-        }
-
-        //fork a child to execute command and arguments        
-        pid_t pid = fork();
-        if (pid < 0) {
-            perror("Failed to fork");
-            exit(EXIT_FAILURE);
-        }
-        else if (pid == 0) {
-            //execute command and arguments
-            add_job(pid);
-            if (execvp(command, args) < 0) {
-                perror("Failed to execute command");
-                exit(EXIT_FAILURE);
-            }
-        }
-        else {
-            if (!background) {
-                //wait for child to finish
-                tcsetpgrp(STDIN_FILENO, pid); //give child control of terminal
-                if (wait(NULL) < 0) {
-                    perror("Failed to wait");
-                    exit(EXIT_FAILURE);
-                }
-                tcsetpgrp(STDIN_FILENO, getpgrp()); //give control back to shell
-            }
-            else {
-                //add to job list
-                add_job(pid);
-            }
-        }
-
-        //free input
-        if (input != NULL) free(input);
-    }
-    return 0;
-}*/

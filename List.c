@@ -81,9 +81,8 @@ struct Job *get(const List *l, int index){ // Returns item at index in list-l
     return n; // we’re there!
 } // get()
 
-int contains(const List *l, struct Job item){ // Does list-l have item?
+int contains(const List *l, pid_t pid){ // Does list-l have item?
     struct Job *n = l->head;
-    pid_t pid = item.pid;
     while (n != NULL) {
         if (n->pid == pid) {
             return 1;

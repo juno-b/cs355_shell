@@ -6,10 +6,18 @@
 TOKENIZER *init_tokenizer(char *string){
     //malloc a tokenizer
     TOKENIZER *tokenizer = malloc(sizeof(TOKENIZER));
-    //copy string into str
-    tokenizer->str = malloc(strlen(string) + 1);
-    strcpy(tokenizer->str, string);
-    //set pos to the start of str
+    if (tokenizer == NULL) {
+        perror("Failed to allocate memory for tokenizer");
+        exit(EXIT_FAILURE);
+    }
+    // Allocate memory for the string and copy it
+    tokenizer->str = strdup(string);
+    if (tokenizer->str == NULL) {
+        perror("Failed to allocate memory for string");
+        free(tokenizer);
+        exit(EXIT_FAILURE);
+    }
+    // Set the position to the start of the string
     tokenizer->pos = tokenizer->str;
     return tokenizer;
 }
@@ -25,6 +33,10 @@ char *get_next_token(TOKENIZER *tokenizer){
     }
     //return the substring without white spaces
     char *token = malloc(tokenizer->pos - start + 1);
+    if (token == NULL) {
+        perror("Failed to allocate memory for token");
+        exit(EXIT_FAILURE);
+    }
     strncpy(token, start, tokenizer->pos - start);
     token[tokenizer->pos - start] = '\0';
     return token;
