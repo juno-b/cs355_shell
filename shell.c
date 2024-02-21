@@ -142,7 +142,6 @@ int parse(){
     }
     add_history(line);
     TOKENIZER *t = init_tokenizer(line);
-    printf("tokenizer initialized\n");
     //count tokens
     while(get_next_token(t) != NULL){
         n++;
@@ -153,15 +152,17 @@ int parse(){
     //store pointers to tokens
     while((toks[i++] = get_next_token(t)) != NULL);
     //if last token is &, set bg flag
-    printf("toks[n-1]: %s\n", toks[n-1]);
-    if(strcmp(toks[n-1], "&") == 0){
+    //printf("toks[n-1]: %s\n", toks[n-1]);
+    if(toks[n-1] != NULL && strcmp(toks[n-1], "&") == 0){
         command_bg = 1;
         toks[n-1] = NULL;
         n--;
     }
+    printf("toks[0]: %s\n", toks[0]);
     //free tokenizer
     free(t);
     free(line);
+    printf("freed\n");
     return n;
 }
 
@@ -201,8 +202,11 @@ int main(void) {
     while(1) {
         int num_toks = parse();
         printf("num_toks: %d\n", num_toks);
-        return 0;
         if(num_toks == 0) continue;
+        if(toks[0] == NULL) {
+            printf("No command stored.\n");
+            exit(EXIT_FAILURE);
+        }
         //compare user input to "exit"
         if (strcmp(toks[0], "exit") == 0) {
             //free input, job_list and clear history

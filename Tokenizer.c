@@ -22,26 +22,46 @@ TOKENIZER *init_tokenizer(char *string){
     tokenizer->pos = tokenizer->str;
     return tokenizer;
 }
-char *get_next_token(TOKENIZER *tokenizer){
-    if (tokenizer == NULL || *(tokenizer->pos) == '\0') // Check if the tokenizer is NULL or at the end of the string
-        return NULL;
 
+char *get_next_token(TOKENIZER *tokenizer){
+    if (*(tokenizer->pos) == '\0' || *(tokenizer->pos) == '\n') {
+        return NULL; // return NULL when string ends or reaches newline
+    }
     while (isspace(*(tokenizer->pos))) // Skip leading white spaces
         (tokenizer->pos)++;
 
-    if (*(tokenizer->pos) == '\0') // Check if the end of the string is reached
-        return NULL;
-
-    char *start = tokenizer->pos; // Start of the token
-    while (*(tokenizer->pos) != '\0' && !isspace(*(tokenizer->pos))) // Find the end of the token
+    // check for delimiters
+    if (*(tokenizer->pos) == '&' || *(tokenizer->pos) == ';' || *(tokenizer->pos) == '|' || *(tokenizer->pos) == '<' || *(tokenizer->pos) == '>') {
+        char *token = (char *)malloc(2 * sizeof(char));
+        if (token == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
+            exit(EXIT_FAILURE);
+        }
+        token[0] = *(tokenizer->pos);
+        token[1] = '\0';
         (tokenizer->pos)++;
+        return token;
+    }
 
-    char *token = (char *)malloc(tokenizer->pos - start + 1); // Allocate memory for the token
+    // find end of token
+    char *start = tokenizer->pos;
+    while (*(tokenizer->pos) != '\0' && *(tokenizer->pos) != '\n' && *(tokenizer->pos) != ' ' &&
+           *(tokenizer->pos) != '&' && *(tokenizer->pos) != ';' && *(tokenizer->pos) != '|' &&
+           *(tokenizer->pos) != '<' && *(tokenizer->pos) != '>') {
+        (tokenizer->pos)++;
+    }
+
+    // compute length of token
+    int length = tokenizer->pos - start;
+    
+    // allocate memory for token and copy substring
+    char *token = (char *)malloc((length + 1) * sizeof(char));
     if (token == NULL) {
-        perror("Memory allocation failed");
+        fprintf(stderr, "Memory allocation failed\n");
         exit(EXIT_FAILURE);
     }
-    strncpy(token, start, tokenizer->pos - start); // Copy the token
-    token[tokenizer->pos - start] = '\0'; // Null-terminate the token
+    strncpy(token, start, length);
+    token[length] = '\0';
+
     return token;
 }
