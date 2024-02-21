@@ -137,19 +137,23 @@ int parse(){
     }
     //handle newline
     if(strcmp(line, "") == 0){
+        free(line);
         return 0;
     }
     add_history(line);
     TOKENIZER *t = init_tokenizer(line);
+    printf("tokenizer initialized\n");
     //count tokens
     while(get_next_token(t) != NULL){
         n++;
     }
+    printf("n: %d\n", n);
     //allocate pointers to tokens
     toks = (char**) malloc((n+1) * sizeof(char*));
     //store pointers to tokens
-    while((toks[i++] = get_next_token(&t)) != NULL);
+    while((toks[i++] = get_next_token(t)) != NULL);
     //if last token is &, set bg flag
+    printf("toks[n-1]: %s\n", toks[n-1]);
     if(strcmp(toks[n-1], "&") == 0){
         command_bg = 1;
         toks[n-1] = NULL;
@@ -196,6 +200,8 @@ int main(void) {
     //loop for shell functionality
     while(1) {
         int num_toks = parse();
+        printf("num_toks: %d\n", num_toks);
+        return 0;
         if(num_toks == 0) continue;
         //compare user input to "exit"
         if (strcmp(toks[0], "exit") == 0) {
