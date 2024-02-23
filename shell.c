@@ -170,18 +170,9 @@ void execute_command(){
 }
 
 //reads a line and returns # of tokens
-int parse(){
+int parse(char *line){
     //store pointers in global array toks
     int i = 0; int n = 0;
-    char * line = readline(MYSH);
-    //handle ctrl+d
-    if(line == NULL) return 0;
-    //handle newline
-    if(strcmp(line, "") == 0){
-        if(line != NULL) free(line);
-        return 0;
-    }
-    //if (DEBUG) printf("Command entered: %s\n", line);
     add_history(line);
     TOKENIZER *t = init_tokenizer(line);
     //count tokens
@@ -194,7 +185,6 @@ int parse(){
             n++;
         }
     }
-    while(get_next_token(t) != NULL) n++;
     if (DEBUG) printf("Number of tokens: %d\n", n);
     //re-initialize tokenizer
     free_tokenizer(t);
@@ -252,7 +242,15 @@ int main(void) {
 
     //loop for shell functionality
     while(1) {
-        int num_toks = parse();
+        char * line = readline(MYSH);
+        //handle ctrl+d
+        if(line == NULL) return 0;
+        //handle newline
+        if(strcmp(line, "") == 0){
+            free(line);
+            return 0;
+        }
+        int num_toks = parse(line);
         if(num_toks == 0) continue;
         if(toks[0] == NULL) {
             printf("No command stored.\n");
@@ -274,12 +272,12 @@ int main(void) {
 
             //add print statements for usage
             if (strcmp(toks[0], "help") == 0) {
-                printf("Exit: exit\n");
-                printf("This terminal supports history using the following commands:\n");
-                printf("Repeat the last line of input: !!\n");
-                printf("Repeat the nth command: !n\n");      
-                printf("Repeat the nth most recent command: !-n\n");
+                printf("This terminal will exit via 'exit' and print the history using the command 'history'.\n");
+                //printf("Repeat the last line of input: !!\n");
+                //printf("Repeat the nth command: !n\n");      
+                //printf("Repeat the nth most recent command: !-n\n");
                 cont_flag = 1;
+                free_toks();
                 input_hist_flag = 0;
             }
 
@@ -287,21 +285,22 @@ int main(void) {
             else if(strcmp(toks[0], "history") == 0){        
                 HIST_ENTRY **hist_list = history_list();     
                 for (int i = 0; hist_list[i] != NULL; i++){  
-
                     printf("%d: %s\n", i + history_base, hist_list[i]->line);
                 }
                 cont_flag = 1;
+                free_toks();
                 input_hist_flag = 0;
             }
-            else if (strcmp(toks[0], "!!") == 0) {
-                HIST_ENTRY *last_entry = history_get(history_length - 1);
-                if (last_entry != NULL) {
-                    strcpy(toks[0],last_entry->line);        
+            /*else if (strcmp(toks[0], "!!") == 0) {
+                HIST_ENTRY *entry = history_get(history_length - 1);
+                if (entry != NULL) {
+                    free_toks();
+                    int num_toks = parse(entry->line);
                 }
                 else {
                     printf("No previous command found!\n");  
-
                     cont_flag = 1;
+                    free_toks();
                     input_hist_flag = 0;
                 }
             }
@@ -312,15 +311,17 @@ int main(void) {
                     if (n < 0) n = history_length + n;       
                     HIST_ENTRY *entry = history_get(n);      
                     if (entry != NULL) {
-                        strcpy(toks[0],entry->line);
+                        free_toks();
+                        int num_toks = parse(entry->line);
                     }
                     else {
                         printf("%s: Command not found.\n", toks[0]);
                         cont_flag = 1;
+                        free_toks();
                         input_hist_flag = 0;
                     }
                 }
-            }
+            }*/
             else{
                 input_hist_flag = 0;
             }
