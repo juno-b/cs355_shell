@@ -60,7 +60,7 @@ char *get_next_token(TOKENIZER *tokenizer){
     int length = tokenizer->pos - start;
 
     // allocate memory for token and copy substring      
-    char *token = (char *)malloc((length + 1) * sizeof(char));
+    char *token = (char *)malloc((length + 2) * sizeof(char));
     if (token == NULL) {
         fprintf(stderr, "Memory allocation failed\n");   
         exit(EXIT_FAILURE);

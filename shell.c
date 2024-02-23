@@ -55,8 +55,12 @@ void handle_sigchld(int sig) {
     }
 }
 
-void handle_sigstop(int sig) {
-    printf("Child process has stopped.\n");
+void child_sigint_handler(int signo) {
+    if (signo == SIGINT) {
+        printf("\n");
+        fflush(stdout); // the new line is not printed
+        exit(EXIT_FAILURE);
+    }
 }
 
 void blockSigchld() {
@@ -133,6 +137,7 @@ void execute_command(){
             exit(EXIT_FAILURE);
         }
         else if(pid == 0){
+            signal(SIGINT, child_sigint_handler);
             //execute command and arguments
             int errno_exec = execvp(toks[0], toks);
             //check for ENOENT
@@ -176,7 +181,7 @@ int parse(){
         if(line != NULL) free(line);
         return 0;
     }
-    if (DEBUG) printf("Command entered: %s\n", line);
+    //if (DEBUG) printf("Command entered: %s\n", line);
     add_history(line);
     TOKENIZER *t = init_tokenizer(line);
     //count tokens
