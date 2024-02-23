@@ -7,6 +7,7 @@
 #include <readline/history.h>
 #include <unistd.h>
 #include <signal.h>
+#include <termios.h>
 #include "List.h"
 #include "Job.h"
 #include "Tokenizer.h"
@@ -24,6 +25,7 @@ int command_fg = 0; //flag for foregrounding
 int command_bg = 0; //flag for backgrounding
 int command_resume = 0; //flag to resume a command in the foreground, 1 = bg
 pid_t last_bg_job = -1; //stores pid of last bg job, -1 if no background job
+struct termios shell_tmodes; //stores terminal modes
 
 //fn prototypes
 void add_job(pid_t pid);
@@ -53,6 +55,33 @@ void handle_sigchld(int sig) {
             num_jobs--;
         }
     }
+}
+
+void ignore_me(int sig) {
+    printf("\n%s", MYSH);
+    fflush(stdout);
+}
+
+void ignore_signals() {
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    signal(SIGINT, &ignore_me);
+    signal(SIGQUIT, &ignore_me);
+    signal(SIGTSTP, &ignore_me);
+    signal(SIGTTIN, &ignore_me);
+    signal(SIGTTOU, &ignore_me);
+    signal(SIGTERM, &ignore_me);
+}
+
+void restore_signals() {
+    signal(SIGINT, SIG_DFL);
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGTSTP, SIG_DFL);
+    signal(SIGTTIN, SIG_DFL);
+    signal(SIGTTOU, SIG_DFL);
+    signal(SIGTERM, SIG_DFL);
 }
 
 void child_sigint_handler(int signo) {
@@ -137,6 +166,7 @@ void execute_command(){
             exit(EXIT_FAILURE);
         }
         else if(pid == 0){
+            restore_signals();
             signal(SIGINT, child_sigint_handler);
             //execute command and arguments
             int errno_exec = execvp(toks[0], toks);
@@ -149,6 +179,7 @@ void execute_command(){
                 perror("Failed to execute command");
                 exit(EXIT_FAILURE);
             }
+            ignore_signals();
         }
         else{
             // Parent process
@@ -219,6 +250,7 @@ void free_toks(){
 }
 
 int main(void) {
+    ignore_signals();
     printf("Welcome to the backgrounding shell! Enter a command to get started.\n");
     printf("Type 'exit' to exit or 'help' for more information\n");
     //Set up signal handler for SIGCHLD
