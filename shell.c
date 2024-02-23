@@ -116,6 +116,12 @@ void run_bg(){
         exit(EXIT_FAILURE);
     }
     else if(pid == 0){
+        //Child process
+        //set pgid to pid
+        if(setpgid(0, 0) < 0){
+            perror("Failed to set child's pgid (from child)");
+            exit(EXIT_FAILURE);
+        }
         //execute command and arguments
         int errno_exec = execvp(toks[0], toks);
         //check for ENOENT
@@ -125,6 +131,14 @@ void run_bg(){
         }
         else if(errno_exec < 0){
             perror("Failed to execute command");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else{
+        //Parent process
+        //set child's pgid to pid
+        if(setpgid(0, 0) < 0){
+            perror("Failed to set child's pgid (from parent)");
             exit(EXIT_FAILURE);
         }
     }
