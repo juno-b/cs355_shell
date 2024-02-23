@@ -58,7 +58,7 @@ void handle_sigchld(int sig) {
 }
 
 void ignore_me(int sig) {
-    printf("\n%s", MYSH);
+    //printf("\n%s", MYSH);
     fflush(stdout);
 }
 
@@ -212,8 +212,9 @@ int parse(char *line){
         char *tok = get_next_token(t);
         if(tok == NULL) flag = 0;
         else{
+            if(strcmp(tok, "&") == 0){ command_bg = 1; if(DEBUG) printf("Backgrounding command\n"); }
+            else n++;
             free(tok);
-            n++;
         }
     }
     if (DEBUG) printf("Number of tokens: %d\n", n);
@@ -223,18 +224,12 @@ int parse(char *line){
     //allocate pointers to tokens
     toks = (char**) malloc((n+1) * sizeof(char*));       
     //store pointers to tokens
-    flag = 1;
-    while(flag){
+    i = 0;
+    while(i < n){
         toks[i] = get_next_token(t);
-        if(toks[i] == NULL) flag = 0;
-        else if (DEBUG) printf("Token %d: %s\n", i, toks[i]);
+        if(toks[i] == NULL) i = n;
+        else if (DEBUG) printf("Token %d: %s\n", i+1, toks[i]);
         i++;
-    }
-    //while((toks[i++] = get_next_token(t)) != NULL);      
-    //if last token is &, set bg flag
-    if(toks[n-1] != NULL && strcmp(toks[n-1], "&") == 0){
-        if(DEBUG) printf("Backgrounding command\n");
-        command_bg = 1;
     }
     //free tokenizer
     free_tokenizer(t);
