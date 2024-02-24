@@ -4,14 +4,18 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <readline/readline.h>
+#include "Tokenizer.h"
 
 #define MAX_ARGS 64
 #define PROMPT "mysh> "
 int running = 1;
+char **toks; // holds pointers to tokens
+int command_bg = 0; // flag for backgrounding
 
-
-void execute_command(char *command);
+void execute_command();
 void child_sigint_handler(int signo);
+int parse(char *line);
+void free_toks();
 
 int main() {
     signal(SIGINT, SIG_IGN);
@@ -20,20 +24,52 @@ int main() {
 
     while (running) {
         input = readline(PROMPT); // print the prompt and get command
+
+        // check null and empty string
         if (!input) {
             printf("\n");
             break;
         }
-
-        char *trimmed_input = strtok(input, "\n");
-        if (trimmed_input) {
-            execute_command(trimmed_input);
+        if(strcmp(input, "") == 0){
+            free(input);
+            break;
         }
+
+
+        int num_toks = parse(input);
+
+        if(num_toks == 0) {
+            continue;
+        }
+
+        if(toks[0] == NULL) {
+            printf("No command stored.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if(toks[0] == NULL) {
+            printf("No command stored.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        blockSigchld();
+        execute_command();
+        unblockSigchld();
+        free_toks();
+
 
         free(input);
     }
 
     return 0;
+}
+
+
+void free_toks(){
+    for(int i = 0; toks[i]!=NULL; i++){
+        free(toks[i]);
+    }
+    free(toks);
 }
 
 void child_sigint_handler(int signo) {
@@ -44,20 +80,10 @@ void child_sigint_handler(int signo) {
     }
 }
 
-void execute_command(char *command) {
-    char *args[MAX_ARGS];
-    
-    int i = 0;
-    char *token = strtok(command, " \t\n&;|><");
-    while (token != NULL && i < MAX_ARGS - 1) {
-        args[i] = token;
-        token = strtok(NULL, " \t\n&;|><");
-        i++;
-    }
-    args[i] = NULL; // null terminated
+void execute_command() {
 
     // built-in command: exit
-    if (strcmp(args[0], "exit") == 0) {
+    if (strcmp(toks[0], "exit") == 0) {
         exit(0);
     }
 
@@ -68,7 +94,7 @@ void execute_command(char *command) {
         return;
     } else if (pid == 0) { // child process
         signal(SIGINT, child_sigint_handler);
-        if (execvp(args[0], args) < 0) {
+        if (execvp(toks[0], toks) < 0) {
             perror("command not found");
             exit(1);
         }
@@ -81,4 +107,48 @@ void execute_command(char *command) {
             }
         }
     }
+}
+
+
+int parse(char *input){ // return number of tokens
+    int i = 0;
+    int n = 0; // number of tokens
+    Tokenizer *tokenizer = init_tokenizer(input);
+
+    int flag = 1;
+    while(flag){
+        char *tok = get_next_token(tokenizer);
+        if(tok == NULL) {
+            flag = 0;
+        } else {
+            free(tok);
+            n++;
+        }
+    }
+
+    //re-initialize tokenizer
+    free_tokenizer(tokenizer);
+    tokenizer = init_tokenizer(input);
+    //allocate pointers to tokens
+    toks = (char**) malloc((n+1) * sizeof(char*));       
+    //store pointers to tokens
+    flag = 1;
+    while(flag){
+        toks[i] = get_next_token(tokenizer);
+        if(toks[i] == NULL) {
+            flag = 0;
+        }
+        i++;
+    }
+
+    // if last token is &
+    if(toks[n-1] != NULL && strcmp(toks[n-1], "&") == 0){
+        command_bg = 1;
+    }
+
+    free_tokenizer(tokenizer);
+    if(input != NULL) {
+        free(input);
+    }
+    return n;
 }
