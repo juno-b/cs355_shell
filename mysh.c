@@ -4,16 +4,31 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <readline/readline.h>
+#include "Job.h"
+#include "List.h"
 #include "Tokenizer.h"
 
 #define MAX_ARGS 64
 #define PROMPT "mysh> "
-int running = 1;
-char **toks; // holds pointers to tokens
-int command_bg = 0; // flag for backgrounding
 
+
+// global variables
+int running = 1;
+List jobs;
+int num_jobs = 0;
+char **toks; // pointers to tokens
+int command_bg = 0; // whether the command is backgrounding
+int command_fg = 0; // whether the command is foregrounding
+int command_resume = 0; // whether the command is to resume a command in the foreground, 1 = bg
+pid_t last_bg_job = -1; // stores the last bg job, -1 represents no bg job
+
+// prototypes
 void execute_command();
 void child_sigint_handler(int signo);
+void blockSigchld();
+void unblockSigchld();
+void run_bg(); // run a process at background
+void to_fg(pid_t pid); // bring a process to foreground
 int parse(char *line);
 void free_toks();
 
@@ -25,16 +40,15 @@ int main() {
     while (running) {
         input = readline(PROMPT); // print the prompt and get command
 
-        // check null and empty string
-        if (!input) {
+        if (!input) { // handle null input
             printf("\n");
             break;
         }
-        if(strcmp(input, "") == 0){
-            free(input);
-            break;
-        }
 
+        if (strcmp(input, "") == 0) { // handle empty string
+            free(input);
+            continue;
+        }
 
         int num_toks = parse(input);
 
@@ -52,16 +66,13 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
-        blockSigchld();
+        //blockSigchld();
         execute_command();
-        unblockSigchld();
+        //unblockSigchld();
         free_toks();
-
-
-        free(input);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
@@ -85,6 +96,12 @@ void execute_command() {
     // built-in command: exit
     if (strcmp(toks[0], "exit") == 0) {
         exit(0);
+    }
+
+    // built-in command: jobs
+    if (strcmp(toks[0], "jobs") == 0) {
+        print(&jobs);
+        return;
     }
 
     // fork a new process to execute the command
