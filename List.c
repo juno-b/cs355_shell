@@ -98,8 +98,7 @@ int contains(const List *l, pid_t pid){ // Does list-l have item?
 void print(const List *l){ // prints contents of list
     struct Job *n = l->head;
     while (n != NULL) {
-        printf("%d ", n->pid);
+        printf("[%d] %d \n", n->jobNum, n->pid);
         n = n->next;
     }
-    printf("\n");
 } // print()

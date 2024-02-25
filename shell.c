@@ -19,12 +19,12 @@
 //emacs -nw hw1.c&
 
 List job_list; //holds a linked list of jobs
-char **toks; //holds pointers to tokens
+char **toks = NULL; //holds pointers to tokens
 int num_jobs = 0; //holds the number of jobs
 int command_fg = 0; //flag for foregrounding
 int command_bg = 0; //flag for backgrounding
 int command_resume = 0; //flag to resume a command in the foreground, 1 = bg
-pid_t last_bg_job = -1; //stores pid of last bg job, -1 if no background job
+int last_bg_job = -1; //stores jobNum of last bg job, -1 if no background job
 struct termios shell_tmodes; //stores terminal modes
 
 //fn prototypes
@@ -111,7 +111,6 @@ void run_bg(char *com){
     //add to job list
     add_job(pid, com, 1);
     last_bg_job = pid;
-    if (DEBUG) printf("Job added to background: %d\n", pid);
     if(pid < 0){
         perror("Failed to fork");
         exit(EXIT_FAILURE);
@@ -134,26 +133,34 @@ void run_bg(char *com){
     }
 }
 
-void to_fg(pid_t pid){
+void to_fg(int jn){
+    if (jn < 1 || jn > num_jobs) {
+        printf("fg: %%%d: no such job\n", jn);
+        return;
+    }
     //check if pid is in job list
-    if(!contains(&job_list, pid)){
-        printf("Job %d not found.\n", pid);
+    struct Job *job = get(&job_list, jn);
+    if (job == NULL) {
+        printf("fg: %%%d: no such job\n", jn);
         return;
     }
     //send SIGCONT to pid
-    if(kill(pid, SIGCONT) < 0){
+    if(kill(job->pid, SIGCONT) < 0){
         perror("Failed to send SIGCONT");
         return;
     }
     //wait for pid to finish
-    tcsetpgrp(STDIN_FILENO, pid); //give child control of terminal
-    if (waitpid(pid, NULL, WUNTRACED) < 0) {
+    if(DEBUG) printf("Waiting for pid %d to finish\n", job->pid);
+    tcsetpgrp(STDIN_FILENO, job->pid); //give child control of terminal
+    if (waitpid(job->pid, NULL, WUNTRACED) < 0) {
         perror("Failed to wait");
         exit(EXIT_FAILURE);
     }
+    if(DEBUG) printf("Giving control back to shell\n");
     tcsetpgrp(STDIN_FILENO, getpgrp()); //give control back to shell
+    if (DEBUG) printf("Success\n");
     //remove from job list
-    remove_job(&job_list, pid);
+    remove_job(&job_list, job->pid);
     num_jobs--;
 }
 
@@ -225,7 +232,11 @@ int parse(char *line){
     free_tokenizer(t);
     t = init_tokenizer(line);
     //allocate pointers to tokens
-    toks = (char**) malloc((n+1) * sizeof(char*));       
+    toks = (char**) malloc((n+1) * sizeof(char*));   
+    if (toks == NULL) {
+        perror("Failed to allocate memory for tokens");
+        exit(EXIT_FAILURE);
+    }    
     //store pointers to tokens
     i = 0;
     while(i < n){
@@ -241,13 +252,11 @@ int parse(char *line){
 }
 
 void free_toks(){
-    if (toks != NULL) {
-        for (int i = 0; toks[i] != NULL; i++) {
-            free(toks[i]);
-        }
-        free(toks);
-        toks = NULL;
+    if(toks == NULL) return;
+    for(int i = 0; toks[i]!=NULL; i++){
+        free(toks[i]);
     }
+    if (toks != NULL) free(toks);
 }
 
 int main(void) {
@@ -326,6 +335,7 @@ int main(void) {
                     struct Job *job = get(&job_list, n);      
                     if (job != NULL) {
                         to_fg(job->pid);
+                        continue;
                     }
                     else {
                         printf("%s: no such job", job->command);
@@ -345,7 +355,7 @@ int main(void) {
                 // Extracting job ID from toks[1]
                 int job_id = atoi(toks[1] + 1); // Skip the first character '%'
                 if (job_id >=1){      
-                    struct Job *job = get(&job_list, n);      
+                    struct Job *job = get(&job_list, job_id-1);      
                     if (job != NULL) to_fg(job->pid);
                     else {
                         printf("%s: Job not found.\n", toks[0]);
