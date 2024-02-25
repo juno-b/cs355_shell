@@ -364,6 +364,50 @@ int main(void) {
                 }
             }
         }
+        else if(strcmp(toks[0], "kill") == 0){
+            if(toks[1] == NULL){
+                printf("No job specified.\n");
+            }
+            //toks[1] can either be %jobNum or -9
+            if(strcmp(toks[1], "-9") == 0){
+                if(toks[2] == NULL){
+                    printf("No job specified.\n");
+                }
+                else{
+                    // Extracting job ID from toks[2]
+                    int job_id = atoi(toks[2] + 1); // Skip the first character '%'
+                    if (job_id >=1){      
+                        struct Job *job = get(&job_list, job_id-1);      
+                        if (job != NULL){
+                            if(kill(job->pid, SIGKILL) < 0){
+                                perror("Failed to send SIGKILL");
+                            }
+                        }
+                        else {
+                            printf("%s: Job not found.\n", toks[0]);   
+                        }
+                    }
+                }
+            }
+            else{
+                // Extracting job ID from toks[1]
+                int job_id = atoi(toks[1] + 1); // Skip the first character '%'
+                if (job_id >=1){      
+                    struct Job *job = get(&job_list, job_id-1);      
+                    if (job != NULL){
+                        if(kill(job->pid, SIGTERM) < 0){
+                            perror("Failed to send SIGTERM");
+                        }
+                    }
+                    else {
+                        printf("%s: Job not found.\n", toks[0]);
+                        
+                    }
+                }
+            }
+            free_toks();
+            continue;
+        }
         else if(strcmp(toks[0], "cd") == 0){
             if(toks[1] == NULL){
                 printf("No directory specified.\n");
