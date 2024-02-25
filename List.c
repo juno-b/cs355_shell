@@ -31,9 +31,12 @@ void clear(List *l) { // removes all items from list-l
     l->size = 0;
 } // clear()
 
-void add(List *l, pid_t item){ // Add item at end of list-l
+void add(List *l, pid_t item, char *com, int stat){ // Add item at end of list-l
     struct Job *n = malloc(sizeof(struct Job));
     n->pid = item;
+    n-> command = com;
+    n->status = stat;
+    n->jobNum = l->size+1;
     n->next = NULL;
     if (l->head == NULL) {
         l->head = n;
@@ -92,7 +95,7 @@ int contains(const List *l, pid_t pid){ // Does list-l have item?
     return 0;
 } // contains()
 
-void print(const List *l){ // prints contents of list (test only)
+void print(const List *l){ // prints contents of list
     struct Job *n = l->head;
     while (n != NULL) {
         printf("%d ", n->pid);

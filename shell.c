@@ -28,19 +28,19 @@ pid_t last_bg_job = -1; //stores pid of last bg job, -1 if no background job
 struct termios shell_tmodes; //stores terminal modes
 
 //fn prototypes
-void add_job(pid_t pid);
+void add_job(pid_t pid, char *com, int stat);
 void handle_sigchld(int sig);
 void handle_sigstop(int sig);
 void blockSigchld();
 void unblockSigchld();
-void run_bg();
+void run_bg(char *com);
 void to_fg(pid_t pid);
-void execute_command();
+void execute_command(char *com);
 int parse();
 void free_toks();
 
-void add_job(pid_t pid) {
-    add(&job_list, pid);
+void add_job(pid_t pid, char *com, int stat) {
+    add(&job_list, pid, com, stat);
     num_jobs++;
 }
 
@@ -106,12 +106,13 @@ void unblockSigchld() {
     sigprocmask(SIG_UNBLOCK, &mask, NULL);
 }
 
-void run_bg(){
+void run_bg(char *com){
     pid_t pid = fork();
     //add to job list
-    add_job(pid);
+    add_job(pid, com, 1);
     last_bg_job = pid;
-    if(pid < 0){
+    if (DEBUG) printf("Job added to background: %d\n", pid);
+    /*if(pid < 0){
         perror("Failed to fork");
         exit(EXIT_FAILURE);
     }
@@ -141,7 +142,7 @@ void run_bg(){
             perror("Failed to set child's pgid (from parent)");
             exit(EXIT_FAILURE);
         }
-    }
+    }*/
 }
 
 void to_fg(pid_t pid){
@@ -167,19 +168,19 @@ void to_fg(pid_t pid){
     num_jobs--;
 }
 
-void execute_command(){
-    if(command_bg == 1) run_bg();
-    else if(last_bg_job != -1) to_fg(last_bg_job);
+void execute_command(char *com){
+    if(command_bg == 1) run_bg(com);
+    else if(last_bg_job != -1) to_fg(last_bg_job); //need to fix
     else{
         pid_t pid = fork();
-        //add to job list
-        add_job(pid);
-        last_bg_job = pid;
         if(pid < 0){
             perror("Failed to fork");
             exit(EXIT_FAILURE);
         }
-        else if(pid == 0){
+        //add to job list
+        add_job(pid, com, 0);
+        last_bg_job = pid;
+        if(pid == 0){
             restore_signals();
             signal(SIGINT, child_sigint_handler);
             //execute command and arguments
@@ -255,7 +256,7 @@ void free_toks(){
     for(int i = 0; toks[i]!=NULL; i++){
         free(toks[i]);
     }
-    free(toks);
+    if (toks != NULL) free(toks);
 }
 
 int main(void) {
@@ -307,73 +308,84 @@ int main(void) {
             printf("Goodbye!\n");
             exit(0);
         }
-        int input_hist_flag = 1;
-        int cont_flag = 0;
-        while(input_hist_flag){
-
-            //add print statements for usage
-            if (strcmp(toks[0], "help") == 0) {
-                printf("This terminal will exit via 'exit' and print the history using the command 'history'.\n");
-                //printf("Repeat the last line of input: !!\n");
-                //printf("Repeat the nth command: !n\n");      
-                //printf("Repeat the nth most recent command: !-n\n");
-                cont_flag = 1;
+        if(strcmp(toks[0], "history") == 0){        
+            HIST_ENTRY **hist_list = history_list();     
+            for (int i = 0; hist_list[i] != NULL; i++){  
+                printf("%d: %s\n", i + history_base, hist_list[i]->line);
+            }
+            free_toks();
+            continue;
+        }
+        else if(strcmp(toks[0], "jobs") == 0){
+            print(&job_list);
+            free_toks();
+            continue;
+        }
+        else if(strcmp(toks[0], "fg") == 0){
+            if(toks[1] == NULL){
+                printf("No job specified.\n");
                 free_toks();
-                input_hist_flag = 0;
+                continue;
             }
-
-            //handle history commands
-            else if(strcmp(toks[0], "history") == 0){        
-                HIST_ENTRY **hist_list = history_list();     
-                for (int i = 0; hist_list[i] != NULL; i++){  
-                    printf("%d: %s\n", i + history_base, hist_list[i]->line);
-                }
-                cont_flag = 1;
-                free_toks();
-                input_hist_flag = 0;
-            }
-            /*else if (strcmp(toks[0], "!!") == 0) {
-                HIST_ENTRY *entry = history_get(history_length - 1);
-                if (entry != NULL) {
-                    free_toks();
-                    int num_toks = parse(entry->line);
-                }
-                else {
-                    printf("No previous command found!\n");  
-                    cont_flag = 1;
-                    free_toks();
-                    input_hist_flag = 0;
-                }
-            }
-            else if (strcmp(toks[0], "!") == 0) {
+            else{
                 int n;
                 if (sscanf(toks[1], "%d", &n) == 1) {        
-                    //!n and !-n
-                    if (n < 0) n = history_length + n;       
-                    HIST_ENTRY *entry = history_get(n);      
-                    if (entry != NULL) {
-                        free_toks();
-                        int num_toks = parse(entry->line);
+                    //fg %n
+                    if (n < 0) n = num_jobs + n;       
+                    struct Job *job = get(&job_list, n);      
+                    if (job != NULL) {
+                        to_fg(job->pid);
                     }
                     else {
-                        printf("%s: Command not found.\n", toks[0]);
-                        cont_flag = 1;
+                        printf("%s: no such job", job->command);
                         free_toks();
-                        input_hist_flag = 0;
+                        continue;
                     }
                 }
-            }*/
-            else{
-                input_hist_flag = 0;
             }
         }
-        if(cont_flag) continue;
+        else if(strcmp(toks[0], "bg") == 0){
+            if(toks[1] == NULL){
+                printf("No job specified.\n");
+                free_toks();
+                continue;
+            }
+            else{
+                int n;
+                // Extracting job ID from toks[1]
+                int job_id = atoi(toks[1] + 1); // Skip the first character '%'
+                if (n >=1){      
+                    struct Job *job = get(&job_list, n);      
+                    if (job != NULL) to_fg(job->pid);
+                    else {
+                        printf("%s: Job not found.\n", toks[0]);
+                        free_toks();
+                        continue;
+                    }
+                }
+            }
+        }
+        else if(strcmp(toks[0], "cd") == 0){
+            if(toks[1] == NULL){
+                printf("No directory specified.\n");
+                free_toks();
+                continue;
+            }
+            else{
+                if(chdir(toks[1]) < 0){
+                    perror("Failed to change directory");
+                    free_toks();
+                    continue;
+                }
+            }
+        }
         blockSigchld();
         if(DEBUG) printf("Executing command...\n");
-        execute_command();
+        execute_command(line);
         if(DEBUG) printf("Command executed.\n");
         unblockSigchld();
         free_toks();
+        //if (line != NULL) free(line);
     }
     return EXIT_SUCCESS;
 }
