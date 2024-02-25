@@ -30,7 +30,10 @@ struct termios shell_tmodes; //stores terminal modes
 //fn prototypes
 void add_job(pid_t pid, char *com, int stat);
 void handle_sigchld(int sig);
-void handle_sigstop(int sig);
+void ignore_me(int sig);
+void ignore_signals();
+void restore_signals();
+void child_sigint_handler(int signo);
 void blockSigchld();
 void unblockSigchld();
 void run_bg(char *com);
@@ -250,7 +253,6 @@ int parse(char *line){
     }
     //free tokenizer
     free_tokenizer(t);
-    if(line != NULL) free(line);
     return n;
 }
 
@@ -287,6 +289,7 @@ int main(void) {
 
     //loop for shell functionality
     while(1) {
+        free_toks();
         char * line = readline(MYSH);
         //handle ctrl+d
         if(line == NULL || strcmp(line, "")==0) continue;
@@ -316,19 +319,15 @@ int main(void) {
             for (int i = 0; hist_list[i] != NULL; i++){  
                 printf("%d: %s\n", i + history_base, hist_list[i]->line);
             }
-            free_toks();
             continue;
         }
         else if(strcmp(toks[0], "jobs") == 0){
             print(&job_list);
-            free_toks();
             continue;
         }
         else if(strcmp(toks[0], "fg") == 0){
             if(toks[1] == NULL){
                 printf("No job specified.\n");
-                free_toks();
-                continue;
             }
             else{
                 // Extracting job ID from toks[1]
@@ -338,17 +337,14 @@ int main(void) {
                     if (job != NULL) to_fg(job_id);
                     else {
                         printf("%s: Job not found.\n", toks[0]);
-                        free_toks();
-                        continue;
                     }
                 }
             }
+            continue;
         }
         else if(strcmp(toks[0], "bg") == 0){
             if(toks[1] == NULL){
                 printf("No job specified.\n");
-                free_toks();
-                continue;
             }
             else{
                 // Extracting job ID from toks[1]
@@ -358,11 +354,10 @@ int main(void) {
                     if (job != NULL) to_fg(job->pid);
                     else {
                         printf("%s: Job not found.\n", toks[0]);
-                        free_toks();
-                        continue;
                     }
                 }
             }
+            continue;
         }
         else if(strcmp(toks[0], "kill") == 0){
             if(toks[1] == NULL){
@@ -405,7 +400,6 @@ int main(void) {
                     }
                 }
             }
-            free_toks();
             continue;
         }
         else if(strcmp(toks[0], "cd") == 0){
@@ -416,19 +410,14 @@ int main(void) {
             else if(chdir(toks[1]) < 0){
                 perror("Failed to change directory");
             }
-            free_toks();
             continue;
-        }
-        else{
-            printf("%s\n", toks[0] );
         }
         blockSigchld();
         if(DEBUG) printf("Executing command...\n");
         execute_command(line);
         if(DEBUG) printf("Command executed.\n");
         unblockSigchld();
-        free_toks();
-        //if (line != NULL) free(line);
+        if(line != NULL) free(line);
     }
     return EXIT_SUCCESS;
 }
