@@ -134,12 +134,13 @@ void run_bg(char *com){
 }
 
 void to_fg(int jn){
+    if(DEBUG) printf("Foregrounding job %d\n", jn);
     if (jn < 1 || jn > num_jobs) {
         printf("fg: %%%d: no such job\n", jn);
         return;
     }
     //check if pid is in job list
-    struct Job *job = get(&job_list, jn);
+    struct Job *job = get(&job_list, jn-1);
     if (job == NULL) {
         printf("fg: %%%d: no such job\n", jn);
         return;
@@ -227,7 +228,7 @@ int parse(char *line){
             free(tok);
         }
     }
-    if (DEBUG) printf("Number of tokens: %d\n", n);
+    //if (DEBUG) printf("Number of tokens: %d\n", n);
     //re-initialize tokenizer
     free_tokenizer(t);
     t = init_tokenizer(line);
@@ -242,7 +243,7 @@ int parse(char *line){
     while(i < n){
         toks[i] = get_next_token(t);
         if(toks[i] == NULL) i = n;
-        else if (DEBUG) printf("Token %d: %s\n", i+1, toks[i]);
+        //else if (DEBUG) printf("Token %d: %s\n", i+1, toks[i]);
         i++;
     }
     //free tokenizer
@@ -284,6 +285,7 @@ int main(void) {
 
     //loop for shell functionality
     while(1) {
+        printf("readline\n");
         char * line = readline(MYSH);
         //handle ctrl+d
         if(line == NULL) return 0;
@@ -328,17 +330,13 @@ int main(void) {
                 continue;
             }
             else{
-                int n;
-                if (sscanf(toks[1], "%d", &n) == 1) {        
-                    //fg %n
-                    if (n < 0) n = num_jobs + n;       
-                    struct Job *job = get(&job_list, n);      
-                    if (job != NULL) {
-                        to_fg(job->pid);
-                        continue;
-                    }
+                // Extracting job ID from toks[1]
+                int job_id = atoi(toks[1] + 1); // Skip the first character '%'
+                if (job_id >=1){      
+                    struct Job *job = get(&job_list, job_id-1);      
+                    if (job != NULL) to_fg(job_id);
                     else {
-                        printf("%s: no such job", job->command);
+                        printf("%s: Job not found.\n", toks[0]);
                         free_toks();
                         continue;
                     }
@@ -368,16 +366,16 @@ int main(void) {
         else if(strcmp(toks[0], "cd") == 0){
             if(toks[1] == NULL){
                 printf("No directory specified.\n");
-                free_toks();
-                continue;
+                
             }
-            else{
-                if(chdir(toks[1]) < 0){
-                    perror("Failed to change directory");
-                    free_toks();
-                    continue;
-                }
+            else if(chdir(toks[1]) < 0){
+                perror("Failed to change directory");
             }
+            free_toks();
+            continue;
+        }
+        else{
+            printf("%s\n", toks[0] );
         }
         blockSigchld();
         if(DEBUG) printf("Executing command...\n");

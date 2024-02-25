@@ -74,7 +74,7 @@ void remove_job(List *l, pid_t item){ // Remove item from list-l
 
 struct Job *get(const List *l, int index){ // Returns item at index in list-l
     if (index < 0 || index >= l->size) {
-        printf("Error: List index out of bounds %d. Exiting!\n", index);
+        printf("Error: List index %d out of bounds. Exiting!\n", index);
         exit(EXIT_FAILURE);
     }
     // index is valid, lets walk…
