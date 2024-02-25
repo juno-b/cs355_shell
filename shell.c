@@ -108,9 +108,6 @@ void unblockSigchld() {
 
 void run_bg(char *com){
     pid_t pid = fork();
-    //add to job list
-    add_job(pid, com, 1);
-    last_bg_job = pid;
     if(pid < 0){
         perror("Failed to fork");
         exit(EXIT_FAILURE);
@@ -118,15 +115,18 @@ void run_bg(char *com){
     else if(pid == 0){
         //Child process
         //set pgid to pid
-        if(setpgid(0, 0) < 0){
+        if(setpgid(0, getpid()) < 0){
             perror("Failed to set child's pgid (from child)");
             exit(EXIT_FAILURE);
         }
     }
     else{
+        //add to job list
+        add_job(pid, com, 1);
+        last_bg_job = pid;
         //Parent process
         //set child's pgid to pid
-        if(setpgid(0, 0) < 0){
+        if(setpgid(pid, pid) < 0){
             perror("Failed to set child's pgid (from parent)");
             exit(EXIT_FAILURE);
         }
@@ -152,13 +152,15 @@ void to_fg(int jn){
     }
     //wait for pid to finish
     if(DEBUG) printf("Waiting for pid %d to finish\n", job->pid);
+    //store terminal grp
+    int term = tcgetpgrp(STDIN_FILENO);
     tcsetpgrp(STDIN_FILENO, job->pid); //give child control of terminal
     if (waitpid(job->pid, NULL, WUNTRACED) < 0) {
         perror("Failed to wait");
         exit(EXIT_FAILURE);
     }
     if(DEBUG) printf("Giving control back to shell\n");
-    tcsetpgrp(STDIN_FILENO, getpgrp()); //give control back to shell
+    tcsetpgrp(STDIN_FILENO, term); //give control back to shell
     if (DEBUG) printf("Success\n");
     //remove from job list
     remove_job(&job_list, job->pid);
@@ -263,7 +265,7 @@ void free_toks(){
 int main(void) {
     ignore_signals();
     printf("Welcome to the backgrounding shell! Enter a command to get started.\n");
-    printf("Type 'exit' to exit or 'help' for more information\n");
+    printf("Type 'exit' to exit and 'history' to see previous processes.\n");
     //Set up signal handler for SIGCHLD
     struct sigaction sa;
     sa.sa_handler = handle_sigchld;
@@ -285,10 +287,9 @@ int main(void) {
 
     //loop for shell functionality
     while(1) {
-        printf("readline\n");
         char * line = readline(MYSH);
         //handle ctrl+d
-        if(line == NULL) return 0;
+        if(line == NULL || strcmp(line, "")==0) continue;
         //handle newline
         if(strcmp(line, "") == 0){
             free(line);
