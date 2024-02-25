@@ -9,6 +9,6 @@ typedef struct Job {
     struct Job *next;
 } Job;
 
-struct Job *newJob(pid_t id, char *com, int stat, int jobNum);
+struct Job *newJob(pid_t id, char *com, int stat);
 
 #endif

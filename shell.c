@@ -112,7 +112,7 @@ void run_bg(char *com){
     add_job(pid, com, 1);
     last_bg_job = pid;
     if (DEBUG) printf("Job added to background: %d\n", pid);
-    /*if(pid < 0){
+    if(pid < 0){
         perror("Failed to fork");
         exit(EXIT_FAILURE);
     }
@@ -123,17 +123,6 @@ void run_bg(char *com){
             perror("Failed to set child's pgid (from child)");
             exit(EXIT_FAILURE);
         }
-        //execute command and arguments
-        int errno_exec = execvp(toks[0], toks);
-        //check for ENOENT
-        if(errno_exec == -1){
-            printf("%s: Command not found\n", toks[0]);  
-            exit(EXIT_FAILURE);
-        }
-        else if(errno_exec < 0){
-            perror("Failed to execute command");
-            exit(EXIT_FAILURE);
-        }
     }
     else{
         //Parent process
@@ -142,7 +131,7 @@ void run_bg(char *com){
             perror("Failed to set child's pgid (from parent)");
             exit(EXIT_FAILURE);
         }
-    }*/
+    }
 }
 
 void to_fg(pid_t pid){
@@ -170,17 +159,13 @@ void to_fg(pid_t pid){
 
 void execute_command(char *com){
     if(command_bg == 1) run_bg(com);
-    else if(last_bg_job != -1) to_fg(last_bg_job); //need to fix
     else{
         pid_t pid = fork();
         if(pid < 0){
             perror("Failed to fork");
             exit(EXIT_FAILURE);
         }
-        //add to job list
-        add_job(pid, com, 0);
-        last_bg_job = pid;
-        if(pid == 0){
+        else if(pid == 0){
             restore_signals();
             signal(SIGINT, child_sigint_handler);
             //execute command and arguments
@@ -198,6 +183,9 @@ void execute_command(char *com){
         }
         else{
             // Parent process
+            // Add to job list
+            add_job(pid, com, 0);
+            last_bg_job = pid;
             // Wait for foreground process to finish
             int status;
             if (waitpid(pid, &status, WUNTRACED) < 0) {
@@ -253,10 +241,13 @@ int parse(char *line){
 }
 
 void free_toks(){
-    for(int i = 0; toks[i]!=NULL; i++){
-        free(toks[i]);
+    if (toks != NULL) {
+        for (int i = 0; toks[i] != NULL; i++) {
+            free(toks[i]);
+        }
+        free(toks);
+        toks = NULL;
     }
-    if (toks != NULL) free(toks);
 }
 
 int main(void) {
@@ -351,10 +342,9 @@ int main(void) {
                 continue;
             }
             else{
-                int n;
                 // Extracting job ID from toks[1]
                 int job_id = atoi(toks[1] + 1); // Skip the first character '%'
-                if (n >=1){      
+                if (job_id >=1){      
                     struct Job *job = get(&job_list, n);      
                     if (job != NULL) to_fg(job->pid);
                     else {
