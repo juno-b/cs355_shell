@@ -36,7 +36,7 @@ char *get_next_token(TOKENIZER *tokenizer){
         (tokenizer->pos)++;
 
     // check for delimiters
-    if (*(tokenizer->pos) == '&' || *(tokenizer->pos) == ';' || *(tokenizer->pos) == '|' || *(tokenizer->pos) == '<' || *(tokenizer->pos) == '>') {
+    if (*(tokenizer->pos) == '&' || *(tokenizer->pos) == '%' || *(tokenizer->pos) == ';' || *(tokenizer->pos) == '|' || *(tokenizer->pos) == '<' || *(tokenizer->pos) == '>') {
         char *token = (char *)malloc(2 * sizeof(char));  
         if (token == NULL) {
             fprintf(stderr, "Memory allocation failed\n");

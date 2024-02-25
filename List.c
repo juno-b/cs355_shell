@@ -68,14 +68,12 @@ void remove_job(List *l, pid_t item){ // Remove item from list-l
         prev = n;
         n = n->next;
     }
-    printf("Error: Item not found in list. Exiting!\n");
-    exit(EXIT_FAILURE);
+    return;
 } // remove()
 
 struct Job *get(const List *l, int index){ // Returns item at index in list-l
     if (index < 0 || index >= l->size) {
-        printf("Error: List index %d out of bounds. Exiting!\n", index);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     // index is valid, lets walk…
     struct Job *n=l->head; // start at head
