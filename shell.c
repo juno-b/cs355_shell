@@ -289,10 +289,13 @@ int main(void) {
 
     //loop for shell functionality
     while(1) {
+        printf("test\n");
         free_toks();
+        printf("test\n");
+        toks = NULL;
         char * line = readline(MYSH);
         //handle ctrl+d
-        if(line == NULL || strcmp(line, "")==0) continue;
+        if(line == NULL) continue;
         //handle newline
         if(strcmp(line, "") == 0){
             free(line);
@@ -308,6 +311,7 @@ int main(void) {
         if (strcmp(toks[0], "exit") == 0) {
             //free input, job_list and clear history     
             clear(&job_list);
+            if(line != NULL) free(line);
             free_toks();
             clear_history();
             //exit
@@ -371,11 +375,11 @@ int main(void) {
             }
             //toks[1] can either be %jobNum or -9
             else if(strcmp(toks[1], "-9") == 0){
-                if(toks[3] == NULL){
+                if(toks[2] == NULL || strcmp(toks[2], "%") != 0 || toks[3] == NULL){
                     printf("No job specified.\n");
                 }
                 else{
-                    // Extracting job ID from toks[2]
+                    // Extracting job ID from toks[3]
                     int job_id = atoi(toks[3]); 
                     if (job_id >=1){      
                         struct Job *job = get(&job_list, job_id-1);      
@@ -385,13 +389,16 @@ int main(void) {
                             }
                         }
                         else {
-                            printf("%s: Job not found.\n", toks[0]);   
+                            printf("%s %s %s%s: Job not found.\n", toks[0], toks[1], toks[2], toks[3]);   
                         }
+                    }
+                    else {
+                        printf("%s %s %s%s: Job not found.\n", toks[0], toks[1], toks[2], toks[3]);   
                     }
                 }
             }
             else if(strcmp(toks[1], "%") == 0){
-                // Extracting job ID from toks[1]
+                // Extracting job ID from toks[2]
                 int job_id = atoi(toks[2]); 
                 if (job_id >=1){      
                     struct Job *job = get(&job_list, job_id-1); 
@@ -401,8 +408,11 @@ int main(void) {
                         }
                     }
                     else {
-                        printf("%s: Job not found.\n", toks[0]);    
+                        printf("%s: %s%s: Job not found.\n", toks[0], toks[1], toks[2]);    
                     }
+                }
+                else{
+                    printf("%s: %s%s: Job not found.\n", toks[0], toks[1], toks[2]);
                 }
             }
             else{

@@ -1,7 +1,7 @@
 all: shell
 
 shell: shell.c List.o Job.o Tokenizer.o
-	gcc -o shell shell.c List.o Job.o Tokenizer.o -lreadline -lhistory
+	gcc -g -o shell shell.c List.o Job.o Tokenizer.o -lreadline -lhistory
 
 List: List.c List.h
 	gcc -c List.c

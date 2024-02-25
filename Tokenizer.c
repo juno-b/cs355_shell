@@ -52,7 +52,7 @@ char *get_next_token(TOKENIZER *tokenizer){
     char *start = tokenizer->pos;
     while (*(tokenizer->pos) != '\0' && *(tokenizer->pos) != '\n' && *(tokenizer->pos) != ' ' &&
            *(tokenizer->pos) != '&' && *(tokenizer->pos) != ';' && *(tokenizer->pos) != '|' &&
-           *(tokenizer->pos) != '<' && *(tokenizer->pos) != '>') {
+           *(tokenizer->pos) != '<' && *(tokenizer->pos) != '%' && *(tokenizer->pos) != '>') {
         (tokenizer->pos)++;
     }
 
