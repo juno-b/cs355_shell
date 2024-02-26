@@ -1,4 +1,7 @@
-all: shell
+all: shell shells
+
+shells: shell_semicolon.c List.o Job.o Tokenizer.o
+	gcc -g -o shells shell_semicolon.c List.o Job.o Tokenizer.o -lreadline -lhistory
 
 shell: shell.c List.o Job.o Tokenizer.o
 	gcc -g -o shell shell.c List.o Job.o Tokenizer.o -lreadline -lhistory

@@ -1,5 +1,7 @@
 DO NOT run this on goldengate. There are unresolved bugs which frequently crash the terminal. See known issues for more.
 
+use shell_semicolon and ./shells for ; handling
+
 Features that work as intended:
 standard (non-backgrounded) commands
 Ctrl+c, ctrl+d, ctrl+z, etc. do not crash the main shell
