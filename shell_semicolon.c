@@ -351,7 +351,6 @@ int main(void) {
         int num_commands = numCommands(line);
         char **commands = split_commands(line, num_commands);
         for(int current_command = 0; current_command < num_commands; current_command++){
-            //if(line != NULL) free(line);
             line = commands[current_command];
             int num_toks = parse(line);
             if(num_toks == 0) continue;
@@ -364,8 +363,8 @@ int main(void) {
                 //free input, job_list and clear history     
                 clear(&job_list);
                 free_commands(commands);
-                if(line != NULL) free(line);
                 free_toks();
+                if(line != NULL) free(line);
                 clear_history();
                 //exit
                 printf("Goodbye!\n");
