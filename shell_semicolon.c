@@ -40,6 +40,9 @@ void to_fg(pid_t pid);
 void execute_command(char *com);
 int parse();
 void free_toks();
+int numCommands(char *line);
+char **split_commands(char *line, int num_commands);
+void free_commands(char **commands);
 
 void add_job(pid_t pid, char *com, int stat) {
     add(&job_list, pid, com, stat);
@@ -217,18 +220,22 @@ void execute_command(char *com){
 
 //reads a line and returns # of tokens
 int parse(char *line){
-    free_toks();
     //store pointers in global array toks
+    free_toks();
     int i = 0; int n = 0;
     add_history(line);
     TOKENIZER *t = init_tokenizer(line);
     //count tokens
     int flag = 1;
+    int num_commands = 0;
     while(flag){
         char *tok = get_next_token(t);
         if(tok == NULL) flag = 0;
         else{
-            if(strcmp(tok, "&") == 0){ command_bg = 1; if(DEBUG) printf("Backgrounding command\n"); }
+            if(strcmp(tok, "&") == 0){ 
+                command_bg = 1; 
+                //if(DEBUG) printf("Backgrounding command\n"); 
+            }
             else n++;
             free(tok);
         }
@@ -238,11 +245,14 @@ int parse(char *line){
     free_tokenizer(t);
     t = init_tokenizer(line);
     //allocate pointers to tokens
-    toks = (char**) malloc((n+1) * sizeof(char*));   
+    toks = (char**) malloc((n+1) * sizeof(char*)); 
     if (toks == NULL) {
         perror("Failed to allocate memory for tokens");
         exit(EXIT_FAILURE);
-    }    
+    }  
+    for (int i = 0; i < n+1; i++) {
+        toks[i] = NULL;
+    }   
     //store pointers to tokens
     i = 0;
     while(i < n){
@@ -256,12 +266,44 @@ int parse(char *line){
     return n;
 }
 
+int numCommands(char *line) {
+    int num_commands = 1; // At least one command exists
+    for (int i = 0; line[i] != '\0'; i++) {
+        if (line[i] == ';') {
+            num_commands++;
+        }
+    }
+    return num_commands;
+}
+
+char **split_commands(char *line, int num_commands) {
+    char **commands = malloc(num_commands * sizeof(char *));
+    if (commands == NULL) {
+        perror("Failed to allocate memory for commands");
+        exit(EXIT_FAILURE);
+    }
+    int command_index = 0;
+    commands[command_index++] = strtok(line, ";");
+    while (command_index < num_commands) {
+        commands[command_index++] = strtok(NULL, ";");
+    }
+    return commands;
+}
+
 void free_toks(){
     if(toks == NULL) return;
     for(int i = 0; toks[i]!=NULL; i++){
         free(toks[i]);
     }
-    if (toks != NULL) free(toks);
+    free(toks);
+}
+
+void free_commands(char **commands) {
+    if(commands == NULL) return;
+    for (int i = 0; commands[i] != NULL; i++) {
+        free(commands[i]);
+    }
+    free(commands);
 }
 
 int main(void) {
@@ -298,141 +340,149 @@ int main(void) {
             free(line);
             continue;
         }
-        int num_toks = parse(line);
-        if(num_toks == 0) continue;
-        if(toks[0] == NULL) {
-            printf("No command stored.\n");
-            exit(EXIT_FAILURE);
-        }
-        //compare user input to "exit"
-        if (strcmp(toks[0], "exit") == 0) {
-            //free input, job_list and clear history     
-            clear(&job_list);
+        int num_commands = numCommands(line);
+        char **commands = split_commands(line, num_commands);
+        for(int current_command = 0; current_command < num_commands; current_command++){
             if(line != NULL) free(line);
-            free_toks();
-            clear_history();
-            //exit
-            printf("Goodbye!\n");
-            exit(0);
-        }
-        if(strcmp(toks[0], "history") == 0){        
-            HIST_ENTRY **hist_list = history_list();     
-            for (int i = 0; hist_list[i] != NULL; i++){  
-                printf("%d: %s\n", i + history_base, hist_list[i]->line);
+            printf("3ommand: %s\n", commands[current_command]);
+            line = commands[current_command];
+            printf("Xommand: %s\n", line);
+            int num_toks = parse(line);
+            if(num_toks == 0) continue;
+            if(toks[0] == NULL) {
+                printf("No command stored.\n");
+                exit(EXIT_FAILURE);
             }
-            continue;
-        }
-        else if(strcmp(toks[0], "jobs") == 0){
-            print(&job_list);
-            continue;
-        }
-        else if(strcmp(toks[0], "fg") == 0){
-            if(toks[1] == NULL || strcmp(toks[1], "%") != 0 || toks[2] == NULL){
-                printf("Job incorrectly specified.\n");
+            //compare user input to "exit"
+            if (strcmp(toks[0], "exit") == 0) {
+                //free input, job_list and clear history     
+                clear(&job_list);
+                free_commands(commands);
+                if(line != NULL) free(line);
+                free_toks();
+                clear_history();
+                //exit
+                printf("Goodbye!\n");
+                exit(0);
             }
-            else{
-                // Extracting job ID from toks[1]
-                int job_id = atoi(toks[2]); 
-                if (job_id >=1){      
-                    struct Job *job = get(&job_list, job_id-1);      
-                    if (job != NULL) to_fg(job_id);
-                    else {
-                        printf("%s: %s: Job not found.\n", toks[0], toks[1]);
-                    }
+            if(strcmp(toks[0], "history") == 0){        
+                HIST_ENTRY **hist_list = history_list();     
+                for (int i = 0; hist_list[i] != NULL; i++){  
+                    printf("%d: %s\n", i + history_base, hist_list[i]->line);
+                }
+                continue;
+            }
+            else if(strcmp(toks[0], "jobs") == 0){
+                print(&job_list);
+                continue;
+            }
+            else if(strcmp(toks[0], "fg") == 0){
+                if(toks[1] == NULL || strcmp(toks[1], "%") != 0 || toks[2] == NULL){
+                    printf("Job incorrectly specified.\n");
                 }
                 else{
-                    printf("%s: %s: Job not found.\n", toks[0], toks[1]);
-                }
-            }
-            continue;
-        }
-        else if(strcmp(toks[0], "bg") == 0){
-            if(toks[1] == NULL || strcmp(toks[1], "%") != 0 || toks[2] == NULL){
-                printf("Job incorrectly specified.\n");
-            }
-            else{
-                // Extracting job ID from toks[1]
-                int job_id = atoi(toks[2]); 
-                if (job_id >=1){      
-                    struct Job *job = get(&job_list, job_id-1);      
-                    if (job != NULL) to_fg(job_id);
-                    else {
-                        printf("%s: %s: Job not found.\n", toks[0], toks[1]);
-                    }
-                }
-                else{
-                    printf("%s: %s: Job not found.\n", toks[0], toks[1]);
-                }
-            }
-            continue;
-        }
-        else if(strcmp(toks[0], "kill") == 0){
-            if(toks[1] == NULL || toks[2] == NULL){
-                printf("No job specified.\n");
-            }
-            //toks[1] can either be %jobNum or -9
-            else if(strcmp(toks[1], "-9") == 0){
-                if(toks[2] == NULL || strcmp(toks[2], "%") != 0 || toks[3] == NULL){
-                    printf("No job specified.\n");
-                }
-                else{
-                    // Extracting job ID from toks[3]
-                    int job_id = atoi(toks[3]); 
+                    // Extracting job ID from toks[1]
+                    int job_id = atoi(toks[2]); 
                     if (job_id >=1){      
                         struct Job *job = get(&job_list, job_id-1);      
-                        if (job != NULL){
-                            if(kill(job->pid, SIGKILL) < 0){
-                                perror("Failed to send SIGKILL");
+                        if (job != NULL) to_fg(job_id);
+                        else {
+                            printf("%s: %s: Job not found.\n", toks[0], toks[1]);
+                        }
+                    }
+                    else{
+                        printf("%s: %s: Job not found.\n", toks[0], toks[1]);
+                    }
+                }
+                continue;
+            }
+            else if(strcmp(toks[0], "bg") == 0){
+                if(toks[1] == NULL || strcmp(toks[1], "%") != 0 || toks[2] == NULL){
+                    printf("Job incorrectly specified.\n");
+                }
+                else{
+                    // Extracting job ID from toks[1]
+                    int job_id = atoi(toks[2]); 
+                    if (job_id >=1){      
+                        struct Job *job = get(&job_list, job_id-1);      
+                        if (job != NULL) to_fg(job_id);
+                        else {
+                            printf("%s: %s: Job not found.\n", toks[0], toks[1]);
+                        }
+                    }
+                    else{
+                        printf("%s: %s: Job not found.\n", toks[0], toks[1]);
+                    }
+                }
+                continue;
+            }
+            else if(strcmp(toks[0], "kill") == 0){
+                if(toks[1] == NULL || toks[2] == NULL){
+                    printf("No job specified.\n");
+                }
+                //toks[1] can either be %jobNum or -9
+                else if(strcmp(toks[1], "-9") == 0){
+                    if(toks[2] == NULL || strcmp(toks[2], "%") != 0 || toks[3] == NULL){
+                        printf("No job specified.\n");
+                    }
+                    else{
+                        // Extracting job ID from toks[3]
+                        int job_id = atoi(toks[3]); 
+                        if (job_id >=1){      
+                            struct Job *job = get(&job_list, job_id-1);      
+                            if (job != NULL){
+                                if(kill(job->pid, SIGKILL) < 0){
+                                    perror("Failed to send SIGKILL");
+                                }
+                            }
+                            else {
+                                printf("%s %s %s%s: Job not found.\n", toks[0], toks[1], toks[2], toks[3]);   
                             }
                         }
                         else {
                             printf("%s %s %s%s: Job not found.\n", toks[0], toks[1], toks[2], toks[3]);   
                         }
                     }
-                    else {
-                        printf("%s %s %s%s: Job not found.\n", toks[0], toks[1], toks[2], toks[3]);   
-                    }
                 }
-            }
-            else if(strcmp(toks[1], "%") == 0){
-                // Extracting job ID from toks[2]
-                int job_id = atoi(toks[2]); 
-                if (job_id >=1){      
-                    struct Job *job = get(&job_list, job_id-1); 
-                    if (job != NULL){
-                        if(kill(job->pid, SIGTERM) < 0){
-                            perror("Failed to send SIGTERM");
+                else if(strcmp(toks[1], "%") == 0){
+                    // Extracting job ID from toks[2]
+                    int job_id = atoi(toks[2]); 
+                    if (job_id >=1){      
+                        struct Job *job = get(&job_list, job_id-1); 
+                        if (job != NULL){
+                            if(kill(job->pid, SIGTERM) < 0){
+                                perror("Failed to send SIGTERM");
+                            }
+                        }
+                        else {
+                            printf("%s: %s%s: Job not found.\n", toks[0], toks[1], toks[2]);    
                         }
                     }
-                    else {
-                        printf("%s: %s%s: Job not found.\n", toks[0], toks[1], toks[2]);    
+                    else{
+                        printf("%s: %s%s: Job not found.\n", toks[0], toks[1], toks[2]);
                     }
                 }
                 else{
-                    printf("%s: %s%s: Job not found.\n", toks[0], toks[1], toks[2]);
+                    printf("Invalid job specified.\n");
                 }
+                continue;
             }
-            else{
-                printf("Invalid job specified.\n");
+            else if(strcmp(toks[0], "cd") == 0){
+                if(toks[1] == NULL){
+                    printf("No directory specified.\n");
+                    
+                }
+                else if(chdir(toks[1]) < 0){
+                    perror("Failed to change directory");
+                }
+                continue;
             }
-            continue;
+            blockSigchld();
+            if(DEBUG) printf("Executing command...\n");
+            execute_command(line);
+            if(DEBUG) printf("Command executed.\n");
+            unblockSigchld();  
         }
-        else if(strcmp(toks[0], "cd") == 0){
-            if(toks[1] == NULL){
-                printf("No directory specified.\n");
-                
-            }
-            else if(chdir(toks[1]) < 0){
-                perror("Failed to change directory");
-            }
-            continue;
-        }
-        blockSigchld();
-        if(DEBUG) printf("Executing command...\n");
-        execute_command(line);
-        if(DEBUG) printf("Command executed.\n");
-        unblockSigchld();
-        if(line != NULL) free(line);
     }
     return EXIT_SUCCESS;
 }
