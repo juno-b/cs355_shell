@@ -282,10 +282,18 @@ char **split_commands(char *line, int num_commands) {
         perror("Failed to allocate memory for commands");
         exit(EXIT_FAILURE);
     }
-    int command_index = 0;
-    commands[command_index++] = strtok(line, ";");
-    while (command_index < num_commands) {
-        commands[command_index++] = strtok(NULL, ";");
+    char *token;
+    int i = 0;
+    const char delim[] = ";";
+    token = strtok(line, delim);
+    while (token != NULL && i < num_commands) {
+        commands[i] = strdup(token); // Allocate memory for each command
+        if (commands[i] == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
+            exit(EXIT_FAILURE);
+        }
+        token = strtok(NULL, delim);
+        i++;
     }
     return commands;
 }
@@ -343,10 +351,8 @@ int main(void) {
         int num_commands = numCommands(line);
         char **commands = split_commands(line, num_commands);
         for(int current_command = 0; current_command < num_commands; current_command++){
-            if(line != NULL) free(line);
-            printf("3ommand: %s\n", commands[current_command]);
+            //if(line != NULL) free(line);
             line = commands[current_command];
-            printf("Xommand: %s\n", line);
             int num_toks = parse(line);
             if(num_toks == 0) continue;
             if(toks[0] == NULL) {
